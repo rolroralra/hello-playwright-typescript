@@ -95,7 +95,7 @@ hello-playwright/
 |--------|-----|----------|
 | TodoMVC | https://demo.playwright.dev/todomvc | 02, 03, 04, 05, 06 |
 | JSONPlaceholder | https://jsonplaceholder.typicode.com | 07 |
-| The Internet | https://the-internet.herokuapp.com | 08 |
+| Expand Testing (Practice) | https://practice.expandtesting.com | 07, 08 |
 
 ---
 

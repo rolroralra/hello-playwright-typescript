@@ -109,14 +109,13 @@ test.describe('인증 테스트', () => {
   });
 });
 
-// ✅ 올바른 패턴 - playwright 픽스처로 픽스처 시스템 밖에서 직접 실행
+// ✅ 올바른 패턴 - newContext()에 storageState 키를 명시적으로 지정
 const STORAGE_STATE_PATH = '.auth/user.json';
 
-// describe 밖에 beforeAll 선언 → test.use() 영향 없음
 test.beforeAll(async ({ playwright }) => {
-  // playwright.chromium.launch()는 픽스처 시스템 외부 → test.use() 설정 무시
   const browser = await playwright.chromium.launch();
-  const context = await browser.newContext();
+  // storageState 키를 명시해야 test.use()의 storageState가 주입되지 않음
+  const context = await browser.newContext({ storageState: undefined });
   const page = await context.newPage();
 
   await page.goto('/login');
@@ -130,12 +129,14 @@ test.describe('인증 테스트', () => {
 
   test('보안 페이지 접근', async ({ page }) => {
     await page.goto('/secure');
-    await expect(page.locator('h2')).toContainText('Secure Area');
+    await expect(page.locator('h1')).toContainText('Secure Area');
   });
 });
 ```
 
-> **핵심 원칙**: storageState 파일 생성은 `describe` 밖 `beforeAll`에서, `playwright.chromium.launch()`로 픽스처 시스템을 우회한다.
+> **함정**: `playwright.chromium.launch()`로 직접 띄운 브라우저도 픽스처 시스템을 완전히 우회하지 못한다. Playwright는 테스트 실행 중 생성되는 **모든** `newContext()` 호출에 `test.use()` 옵션을 주입한다(옵션 객체에 없는 키만 채움). 그래서 `.auth/user.json`이 이전 실행에서 남아 있으면 로그인된 세션이 로드되어 `/login` 폼이 렌더링되지 않고 타임아웃이 발생하며, 파일이 없으면 `ENOENT`가 발생한다.
+>
+> **핵심 원칙**: storageState 파일을 만드는 컨텍스트는 `newContext({ storageState: undefined })`처럼 키를 명시해 항상 빈 상태에서 로그인한다.
 
 ## 전략 2: 각 테스트마다 로그인
 

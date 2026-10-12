@@ -47,8 +47,8 @@ test.describe('커스텀 픽스처 활용', () => {
 
   test('authenticatedPage 픽스처 - 로그인된 상태', async ({ authenticatedPage }) => {
     // 이미 로그인된 상태의 페이지
-    await authenticatedPage.goto('https://the-internet.herokuapp.com/secure');
-    await expect(authenticatedPage.locator('h2')).toContainText('Secure Area');
+    await authenticatedPage.goto('https://practice.expandtesting.com/secure');
+    await expect(authenticatedPage.locator('h1')).toContainText('Secure Area');
   });
 });
 

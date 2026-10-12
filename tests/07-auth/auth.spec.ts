@@ -11,7 +11,8 @@ import * as fs from "fs";
  * 전략 2: 각 테스트마다 로그인 수행 (느리지만 단순)
  * 전략 3: API로 로그인 토큰 발급 후 쿠키/헤더 설정
  *
- * 실습 대상: https://the-internet.herokuapp.com/login
+ * 실습 대상: https://practice.expandtesting.com/login
+ * (기존 the-internet.herokuapp.com은 503으로 서비스 중단되어 교체)
  */
 
 const STORAGE_STATE_PATH = path.join(process.cwd(), ".auth", "user.json");
@@ -24,23 +25,28 @@ const STORAGE_STATE_PATH = path.join(process.cwd(), ".auth", "user.json");
  * beforeAll 내 browser.newContext()에도 적용되어, 아직 없는 파일을 읽으려다
  * ENOENT 에러가 발생한다.
  *
- * 해결: playwright.chromium.launch()로 픽스처 시스템 밖에서 브라우저를 직접
- * 실행하면 test.use() 설정의 영향을 받지 않는다.
+ * 주의: playwright.chromium.launch()로 직접 띄운 브라우저도 newContext() 시
+ * test.use() 옵션이 주입된다 (옵션에 명시되지 않은 키만 채워 넣음).
+ * 파일이 이미 있으면 이전 실행의 로그인 세션이 로드되어 /login 폼이
+ * 렌더링되지 않고, 없으면 ENOENT 에러가 발생한다.
+ *
+ * 해결: newContext({ storageState: undefined })로 키를 명시하면
+ * test.use()의 storageState가 주입되지 않아 항상 깨끗한 상태로 로그인한다.
  */
 test.beforeAll(async ({ playwright }) => {
   fs.mkdirSync(path.dirname(STORAGE_STATE_PATH), { recursive: true });
 
-  // 픽스처 시스템 외부에서 직접 브라우저 실행 → test.use() 영향 없음
   const browser = await playwright.chromium.launch();
-  const context = await browser.newContext();
+  // storageState 키를 명시해야 test.use()의 storageState 주입을 막을 수 있음
+  const context = await browser.newContext({ storageState: undefined });
   const page = await context.newPage();
 
-  await page.goto("https://the-internet.herokuapp.com/login");
-  await page.getByLabel("Username").fill("tomsmith");
+  await page.goto("https://practice.expandtesting.com/login");
+  await page.getByLabel("Username").fill("practice");
   await page.getByLabel("Password").fill("SuperSecretPassword!");
   await page.getByRole("button", { name: "Login" }).click();
 
-  await expect(page.locator(".flash.success")).toBeVisible();
+  await expect(page.locator("#flash.alert-success")).toBeVisible();
 
   // 인증 상태 파일로 저장
   await context.storageState({ path: STORAGE_STATE_PATH });
@@ -61,22 +67,22 @@ test.describe("전략 1: storageState로 세션 재사용", () => {
 
   test("로그인 상태에서 보안 페이지 접근", async ({ page }) => {
     // storageState로 이미 로그인된 상태 - 로그인 코드 없어도 됨
-    await page.goto("https://the-internet.herokuapp.com/secure");
+    await page.goto("https://practice.expandtesting.com/secure");
 
-    // .flash.success는 로그인 직후 리다이렉트 시에만 표시됨
+    // #flash.alert-success는 로그인 직후 리다이렉트 시에만 표시됨
     // storageState로 직접 접근 시에는 Secure Area 콘텐츠로 확인
-    await expect(page.locator("h2")).toContainText("Secure Area");
+    await expect(page.locator("h1")).toContainText("Secure Area");
     await expect(page.getByRole("link", { name: "Logout" })).toBeVisible();
   });
 
   test("로그인 상태 유지 - 여러 페이지 이동", async ({ page }) => {
-    await page.goto("https://the-internet.herokuapp.com/secure");
-    await expect(page.locator("h2")).toContainText("Secure Area");
+    await page.goto("https://practice.expandtesting.com/secure");
+    await expect(page.locator("h1")).toContainText("Secure Area");
 
     // 다른 페이지 이동 후 돌아와도 세션 유지
-    await page.goto("https://the-internet.herokuapp.com");
-    await page.goto("https://the-internet.herokuapp.com/secure");
-    await expect(page.locator("h2")).toContainText("Secure Area");
+    await page.goto("https://practice.expandtesting.com");
+    await page.goto("https://practice.expandtesting.com/secure");
+    await expect(page.locator("h1")).toContainText("Secure Area");
   });
 });
 
@@ -88,28 +94,28 @@ test.describe("전략 1: storageState로 세션 재사용", () => {
  */
 test.describe("전략 2: 각 테스트마다 로그인", () => {
   test("로그인 후 보안 페이지 접근", async ({ page }) => {
-    await page.goto("https://the-internet.herokuapp.com/login");
-    await page.getByLabel("Username").fill("tomsmith");
+    await page.goto("https://practice.expandtesting.com/login");
+    await page.getByLabel("Username").fill("practice");
     await page.getByLabel("Password").fill("SuperSecretPassword!");
     await page.getByRole("button", { name: "Login" }).click();
 
-    await expect(page.locator(".flash.success")).toBeVisible();
+    await expect(page.locator("#flash.alert-success")).toBeVisible();
     await expect(page).toHaveURL(/\/secure/);
   });
 
   test("잘못된 자격증명으로 로그인 실패", async ({ page }) => {
-    await page.goto("https://the-internet.herokuapp.com/login");
+    await page.goto("https://practice.expandtesting.com/login");
     await page.getByLabel("Username").fill("wronguser");
     await page.getByLabel("Password").fill("wrongpassword");
     await page.getByRole("button", { name: "Login" }).click();
 
-    await expect(page.locator(".flash.error")).toBeVisible();
+    await expect(page.locator("#flash.alert-danger")).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
 
   test("로그아웃", async ({ page }) => {
-    await page.goto("https://the-internet.herokuapp.com/login");
-    await page.getByLabel("Username").fill("tomsmith");
+    await page.goto("https://practice.expandtesting.com/login");
+    await page.getByLabel("Username").fill("practice");
     await page.getByLabel("Password").fill("SuperSecretPassword!");
     await page.getByRole("button", { name: "Login" }).click();
     await expect(page).toHaveURL(/\/secure/);

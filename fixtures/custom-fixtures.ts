@@ -83,10 +83,12 @@ export const test = base.extend<CustomFixtures>({
    */
   authenticatedPage: async ({ page }, use) => {
     // 로그인 수행
-    await page.goto('https://the-internet.herokuapp.com/login');
-    await page.getByLabel('Username').fill('tomsmith');
+    await page.goto('https://practice.expandtesting.com/login');
+    await page.getByLabel('Username').fill('practice');
     await page.getByLabel('Password').fill('SuperSecretPassword!');
     await page.getByRole('button', { name: 'Login' }).click();
+    // 로그인 완료(보안 페이지 리다이렉트)까지 대기 후 페이지 제공
+    await page.waitForURL('**/secure');
 
     await use(page);
   },
